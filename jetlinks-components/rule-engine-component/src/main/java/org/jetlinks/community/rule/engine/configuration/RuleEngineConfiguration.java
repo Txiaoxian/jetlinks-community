@@ -21,10 +21,12 @@ import org.jetlinks.rule.engine.model.RuleModelParserStrategy;
 import org.jetlinks.rule.engine.model.antv.AntVG6RuleModelParserStrategy;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@EnableConfigurationProperties(RuleEngineProperties.class)
 @Slf4j
 public class RuleEngineConfiguration {
 
@@ -39,7 +41,7 @@ public class RuleEngineConfiguration {
     }
 
     @Bean
-    public TermsConditionEvaluator termsConditionEvaluator(){
+    public TermsConditionEvaluator termsConditionEvaluator() {
         return new TermsConditionEvaluator();
     }
 

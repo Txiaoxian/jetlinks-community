@@ -240,7 +240,7 @@ public class MenuController implements ReactiveServiceCrudController<MenuEntity,
     }
 
 
-    @PostMapping("/asset-types")
+    @GetMapping("/asset-types")
     @ResourceAction(id = "grant", name = "授权")
     @Operation(summary = "根据菜单获取对应的资产类型")
     @Deprecated

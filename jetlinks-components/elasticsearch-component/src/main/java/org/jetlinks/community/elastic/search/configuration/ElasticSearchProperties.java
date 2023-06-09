@@ -16,7 +16,7 @@ import java.util.List;
 @Setter
 public class ElasticSearchProperties {
 
-    private String host = "localhost";
+    private String host = "192.168.8.92";
     private int port = 9200;
 
     private int connectionRequestTimeout = 5000;

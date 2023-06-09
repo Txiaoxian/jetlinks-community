@@ -35,6 +35,10 @@ public class SqlRule implements Serializable {
 
     private List<Action> whenErrorThen;
 
+    public boolean isGroup() {
+        return sql.contains("group by") || sql.contains("GROUP BY");
+    }
+
     public void validate() {
         Assert.notNull(type, "type不能为空");
 

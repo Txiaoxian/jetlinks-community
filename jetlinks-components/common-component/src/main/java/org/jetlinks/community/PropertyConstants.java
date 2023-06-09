@@ -5,6 +5,7 @@ import org.jetlinks.core.config.ConfigKey;
 import org.jetlinks.core.message.HeaderKey;
 
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -27,6 +28,15 @@ public interface PropertyConstants {
 
     //设备接入网关ID
     Key<String> accessId = Key.of("accessId");
+
+    //租户ID
+    Key<List<String>> tenantId = Key.of("tenantId");
+
+    //分组ID
+    Key<List<String>> groupId = Key.of("groupId");
+
+    //租户成员ID
+    Key<List<String>> tenantMemberId = Key.of("members");
 
     /**
      * 设备接入方式

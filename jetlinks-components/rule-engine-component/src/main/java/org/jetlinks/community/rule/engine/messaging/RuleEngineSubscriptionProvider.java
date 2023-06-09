@@ -4,11 +4,20 @@ import org.jetlinks.community.gateway.external.Message;
 import org.jetlinks.community.gateway.external.SubscribeRequest;
 import org.jetlinks.community.gateway.external.SubscriptionProvider;
 import org.jetlinks.core.event.EventBus;
-import org.jetlinks.core.event.Subscription;
+import org.jetlinks.core.utils.TopicUtils;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import static org.jetlinks.core.event.Subscription.Feature;
+import static org.jetlinks.core.event.Subscription.of;
 
+
+/**
+ * 通过Websocket订阅规则引擎执行相关记录
+ *
+ * @author zhouhao
+ * @since 1.0
+ */
 @Component
 public class RuleEngineSubscriptionProvider implements SubscriptionProvider {
 
@@ -35,12 +44,16 @@ public class RuleEngineSubscriptionProvider implements SubscriptionProvider {
 
     @Override
     public Flux<Message> subscribe(SubscribeRequest request) {
-        String subscriber=request.getId();
+        String subscriber = request.getId();
 
-        org.jetlinks.core.event.Subscription subscription = org.jetlinks.core.event.Subscription.of(subscriber,request.getTopic(), org.jetlinks.core.event.Subscription.Feature.local, Subscription.Feature.broker);
-
-        return eventBus
-            .subscribe(subscription)
-            .map(msg -> Message.success(request.getId(), msg.getTopic(), msg.decode()));
+        return Flux
+            .fromIterable(TopicUtils.expand(request.getTopic()))
+            .collectList()
+            .map(topics -> of(subscriber,
+                topics.toArray(new String[0]),
+                Feature.local,
+                Feature.broker))
+            .flatMapMany(eventBus::subscribe)
+            .map(msg -> Message.success(request.getId(), msg.getTopic(), msg.decode(true)));
     }
 }

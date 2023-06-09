@@ -1,15 +1,21 @@
 package org.jetlinks.community.rule.engine.executor;
 
+import com.alibaba.fastjson.JSONObject;
+import com.api.jsonata4java.Expression;
+import com.api.jsonata4java.expressions.ParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.hswebframework.web.bean.FastBeanCopier;
+import org.jetlinks.community.rule.engine.editor.annotation.EditorResource;
+import org.jetlinks.community.rule.engine.model.nodes.NodeConverter;
 import org.jetlinks.community.utils.TimeUtils;
 import org.jetlinks.rule.engine.api.RuleConstants;
 import org.jetlinks.rule.engine.api.RuleData;
 import org.jetlinks.rule.engine.api.RuleDataHelper;
+import org.jetlinks.rule.engine.api.model.RuleNodeModel;
 import org.jetlinks.rule.engine.api.task.ExecutionContext;
 import org.jetlinks.rule.engine.api.task.TaskExecutor;
 import org.jetlinks.rule.engine.api.task.TaskExecutorProvider;
@@ -20,30 +26,64 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
 @Slf4j
 @AllArgsConstructor
 @Component
-public class DelayTaskExecutorProvider implements TaskExecutorProvider {
+@EditorResource(
+    id = "delay",
+    name = "延迟",
+    editor = "rule-engine/editor/common/7-delay.html",
+    helper = "rule-engine/i18n/zh-CN/common/89-delay.html",
+    order = 20
+)
+public class DelayTaskExecutorProvider implements TaskExecutorProvider, NodeConverter {
 
     public static final String EXECUTOR = "delay";
+
     private final Scheduler scheduler;
     static ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public String getExecutor() {
-        return EXECUTOR;
+        return "delay";
     }
 
     @Override
     public Mono<TaskExecutor> createTask(ExecutionContext context) {
         return Mono.just(new DelayTaskExecutor(context, scheduler));
     }
+
+    @Override
+    public String getNodeType() {
+        return getExecutor();
+    }
+
+    @Override
+    public RuleNodeModel convert(JSONObject nodeJson) {
+        RuleNodeModel nodeModel = new RuleNodeModel();
+
+        Map<String, Object> newConf = new HashMap<>(nodeJson);
+        newConf.remove("x");
+        newConf.remove("y");
+        newConf.remove("z");
+        newConf.remove("name");
+        newConf.remove("id");
+        newConf.remove("wires");
+        newConf.remove("type");
+        nodeModel.setConfiguration(newConf);
+
+        return nodeModel;
+    }
+
 
     static class DelayTaskExecutor extends AbstractTaskExecutor {
 
@@ -54,7 +94,7 @@ public class DelayTaskExecutorProvider implements TaskExecutorProvider {
         public DelayTaskExecutor(ExecutionContext context, Scheduler scheduler) {
             super(context);
             this.scheduler = scheduler;
-            init();
+            reload();
         }
 
         @Override
@@ -66,22 +106,18 @@ public class DelayTaskExecutorProvider implements TaskExecutorProvider {
                 .create(context.getInput().accept(), context, scheduler)
                 .map(context::newRuleData)
                 .flatMap(ruleData ->
-                             context
-                                 .fireEvent(RuleConstants.Event.result, ruleData)
-                                 .then(context.getOutput().write(Mono.just(ruleData)))
+                    context
+                        .fireEvent(RuleConstants.Event.result, ruleData)
+                        .then(context.getOutput().write(Mono.just(ruleData)))
                 )
                 .onErrorResume(err -> context.onError(err, null))
                 .subscribe();
         }
 
-        void init() {
-            config = DelayTaskExecutorConfig.of(context.getJob().getConfiguration());
-        }
-
         @Override
         public void reload() {
-            init();
-            disposable = doStart();
+            super.reload();
+            config = DelayTaskExecutorConfig.of(context.getJob().getConfiguration());
         }
 
         @Override
@@ -213,7 +249,7 @@ public class DelayTaskExecutorProvider implements TaskExecutorProvider {
                             stream = window
                                 .index()
                                 .flatMap(tp2 -> {
-                                    if (tp2.getT1() < config.getRate()) {
+                                    if (tp2.getT1() <= config.getRate()) {
                                         return Mono.just(tp2.getT2());
                                     }
                                     return context.fireEvent(RuleConstants.Event.error, context.newRuleData(tp2.getT2()));
@@ -230,6 +266,36 @@ public class DelayTaskExecutorProvider implements TaskExecutorProvider {
                             })
                             ;
                     }, Integer.MAX_VALUE);
+            }
+        },
+        group {//分组速率限制
+
+            @Override
+            Flux<RuleData> create(DelayTaskExecutorConfig config,
+                                  Flux<RuleData> flux,
+                                  ExecutionContext context,
+                                  Scheduler scheduler) {
+                try {
+                    Expression expression = Expression.jsonata(config.groupExpression);
+                    Function<RuleData, String> mapper = ctx -> {
+                        try {
+                            return expression
+                                .evaluate(objectMapper.valueToTree(RuleDataHelper.toContextMap(ctx)))
+                                .asText("null");
+                        } catch (Throwable e) {
+                            context.onError(e, ctx).subscribe();
+                            return "null";
+                        }
+                    };
+                    return flux
+                        .groupBy(mapper, Integer.MAX_VALUE)
+                        .flatMap(group -> {
+                            context.getLogger().debug("start rate limit group [{}]", group.key());
+                            return rate.create(config, group, context, scheduler);
+                        });
+                } catch (ParseException | IOException e) {
+                    throw new IllegalArgumentException("分组表达式[" + config.groupExpression + "]格式错误", e);
+                }
             }
         };
 

@@ -10,7 +10,6 @@ import org.hswebframework.web.bean.FastBeanCopier;
 import org.hswebframework.web.utils.ExpressionUtils;
 import org.jetlinks.rule.engine.api.RuleData;
 import org.jetlinks.rule.engine.api.RuleDataHelper;
-import org.jetlinks.rule.engine.api.model.NodeType;
 import org.jetlinks.rule.engine.api.task.ExecutionContext;
 import org.jetlinks.rule.engine.api.task.TaskExecutor;
 import org.jetlinks.rule.engine.api.task.TaskExecutorProvider;
@@ -68,8 +67,6 @@ public class SqlExecutorTaskExecutorProvider implements TaskExecutorProvider {
     public static class Config {
 
         private String dataSourceId;
-
-        private NodeType nodeType = NodeType.MAP;
 
         private String sql;
 
