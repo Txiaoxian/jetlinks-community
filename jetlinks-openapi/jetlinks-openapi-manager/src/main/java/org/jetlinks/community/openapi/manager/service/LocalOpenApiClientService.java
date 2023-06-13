@@ -11,7 +11,7 @@ import org.jetlinks.community.auth.entity.UserDetail;
 import org.jetlinks.community.auth.service.OrganizationService;
 import org.jetlinks.community.auth.service.RoleService;
 import org.jetlinks.community.auth.service.UserDetailService;
-import org.jetlinks.community.openapi.manager.entity.OpenApiClient;
+import org.jetlinks.community.openapi.OpenApiClient;
 import org.jetlinks.community.openapi.manager.entity.OpenApiClientEntity;
 import org.jetlinks.community.openapi.manager.enums.DataStatus;
 import org.reactivestreams.Publisher;
@@ -23,6 +23,9 @@ import reactor.core.publisher.Mono;
 import java.util.Collections;
 
 
+/**
+ * @author Txiaoxian
+ */
 @Service
 @Slf4j
 @AllArgsConstructor
@@ -83,9 +86,12 @@ public class LocalOpenApiClientService extends GenericReactiveCacheSupportCrudSe
     }
 
     public Mono<Integer> doSyncUser(OpenApiClient entity) {
-        OpenApiClientEntity openApiClientEntity = entity.toOpenApiClientEntity();
+        OpenApiClientEntity openApiClientEntity = new OpenApiClientEntity(entity);
         return findById(openApiClientEntity.getId())
-            .flatMap(old -> super.updateById(old.getId(), Mono.just(openApiClientEntity)))
+            .flatMap(old -> super.updateById(old.getId(), Mono.just(openApiClientEntity))
+                .then(roleService.bindUser(Collections.singleton(old.getUserId()), entity.getRoleIdList(), true))
+                .then(organizationService.bindUser(Collections.singleton(old.getUserId()), entity.getOrgIdList(), true))
+                .thenReturn(1))
             .switchIfEmpty(Mono.defer(() -> userService
                 .findByUsername(entity.getAppId())
                 .flatMap(user -> Mono.error(new BusinessException("用户已存在,请勿重复添加!")))
@@ -95,24 +101,34 @@ public class LocalOpenApiClientService extends GenericReactiveCacheSupportCrudSe
                     userDetail.setUsername(entity.getAppId());
                     userDetail.setPassword(entity.getSecureKey());
                     userDetail.setStatus(DataStatus.STATUS_ENABLED);
-                    boolean isUpdate = StringUtils.hasText(userDetail.getId());
                     UserEntity userEntity = userDetail.toUserEntity();
                     return userService
                         .saveUser(Mono.just(userEntity))
                         .then(Mono.fromSupplier(userEntity::getId))
                         .flatMap(userId -> {
                             userDetail.setId(userId);
+                            openApiClientEntity.setUserId(userId);
                             //保存详情
                             return
                                 userDetailService.save(userDetail.toDetailEntity())
                                     //绑定角色
-                                    .then(roleService.bindUser(Collections.singleton(userId), entity.getRoleIdList(), isUpdate))
+                                    .then(roleService.bindUser(Collections.singleton(userId), entity.getRoleIdList(), false))
                                     //绑定机构部门
-                                    .then(organizationService.bindUser(Collections.singleton(userId), entity.getOrgIdList(), isUpdate))
+                                    .then(organizationService.bindUser(Collections.singleton(userId), entity.getOrgIdList(), false))
                                     .then(super.save(Mono.just(openApiClientEntity)))
                                     .thenReturn(userId);
                         });
                 })).thenReturn(1)));
 
+    }
+
+    public Mono<Integer> deleteByApplication(String applicationId) {
+
+        return createQuery()
+            .where()
+            .and(OpenApiClientEntity::getApplicationId, applicationId)
+            .fetchOne()
+            .flatMap(o -> userService.deleteUser(o.getUserId())
+                .then(super.deleteById(o.getId()))).thenReturn(1);
     }
 }

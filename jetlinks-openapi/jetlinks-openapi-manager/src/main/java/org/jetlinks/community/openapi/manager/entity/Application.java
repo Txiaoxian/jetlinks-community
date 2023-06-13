@@ -1,24 +1,13 @@
 package org.jetlinks.community.openapi.manager.entity;
 
-import com.alibaba.fastjson.JSON;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
-import org.hswebframework.ezorm.rdb.mapping.annotation.ColumnType;
-import org.hswebframework.ezorm.rdb.mapping.annotation.DefaultValue;
-import org.hswebframework.ezorm.rdb.mapping.annotation.EnumCodec;
-import org.hswebframework.ezorm.rdb.mapping.annotation.JsonCodec;
-import org.hswebframework.web.system.authorization.api.entity.UserEntity;
-import org.jetlinks.community.auth.entity.UserDetail;
+import org.jetlinks.community.openapi.OpenApiClient;
 import org.jetlinks.community.openapi.manager.enums.ApplicationIntegrationModes;
 import org.jetlinks.community.openapi.manager.enums.ApplicationState;
 
-import javax.persistence.Column;
-import javax.validation.constraints.NotBlank;
 import java.io.Serializable;
-import java.sql.JDBCType;
-import java.util.List;
-import java.util.Map;
 
 @Getter
 @Setter
@@ -60,6 +49,7 @@ public class Application implements Serializable {
         this.setIntegrationModes(entity.getIntegrationModes());
         this.setProvider(entity.getProvider());
         this.setState(entity.getState());
+        this.setDescription(entity.getDescription());
         if (entity.getCreateTime() != null) {
             this.setCreateTime(entity.getCreateTime());
         }
@@ -77,7 +67,7 @@ public class Application implements Serializable {
         applicationEntity.setDescription(this.description);
         applicationEntity.setProvider(this.provider);
         applicationEntity.setIntegrationModes(this.integrationModes);
-
+        applicationEntity.setState(this.state);
         return applicationEntity;
     }
 }

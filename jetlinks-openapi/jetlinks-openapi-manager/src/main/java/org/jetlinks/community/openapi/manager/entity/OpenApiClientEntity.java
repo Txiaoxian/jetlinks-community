@@ -5,17 +5,22 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 import org.hswebframework.ezorm.rdb.mapping.annotation.ColumnType;
+import org.hswebframework.ezorm.rdb.mapping.annotation.DefaultValue;
 import org.hswebframework.ezorm.rdb.mapping.annotation.EnumCodec;
 import org.hswebframework.web.api.crud.entity.GenericEntity;
 import org.hswebframework.web.api.crud.entity.RecordCreationEntity;
 import org.hswebframework.web.crud.generator.Generators;
 import org.hswebframework.web.oauth2.server.OAuth2Client;
+import org.jetlinks.community.openapi.OpenApiClient;
+import org.jetlinks.community.openapi.Signature;
+import org.jetlinks.community.openapi.manager.enums.ApplicationState;
 import org.jetlinks.community.openapi.manager.enums.DataStatusEnum;
 
 import javax.persistence.Column;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Table;
 import javax.validation.constraints.NotBlank;
+import java.util.Arrays;
 
 @Getter
 @Setter
@@ -52,12 +57,15 @@ public class OpenApiClientEntity extends GenericEntity<String> implements Record
 
     //白名单IP地址
     @Column(name = "ip_white_list")
-    @Schema(description = "IP白名单,多个用,分隔")
+    @Schema(description = "IP白名单,多个用回车分隔")
     private String ipWhiteList;
 
     //签名方式
     @Column(name = "signature")
+//    @ColumnType(javaType = String.class)
+//    @EnumCodec
     @Schema(description = "签名方式,MD5或者SHA256")
+    @DefaultValue("MD5")
     private String signature;
 
     //用户ID
@@ -80,11 +88,13 @@ public class OpenApiClientEntity extends GenericEntity<String> implements Record
     private String description;
 
     //状态
-    @Column(name = "status")
-    @ColumnType(javaType = Byte.class)
-    @EnumCodec
     @Schema(description = "状态")
-    private DataStatusEnum status;
+    @Column(length = 32, nullable = false)
+    @EnumCodec
+    @ColumnType(javaType = String.class)
+    @NotBlank
+    @DefaultValue("enabled")
+    private ApplicationState status;
 
     //创建用户ID
     @Column(name = "creator_id")
@@ -108,7 +118,7 @@ public class OpenApiClientEntity extends GenericEntity<String> implements Record
     }
 
     public boolean statusIsEnabled() {
-        return status == DataStatusEnum.ENABLED;
+        return status == ApplicationState.enabled;
     }
 
     public OAuth2Client toOAuth2Client() {
@@ -120,4 +130,36 @@ public class OpenApiClientEntity extends GenericEntity<String> implements Record
         client.setName(clientName);
         return client;
     }
+
+    public static OpenApiClient of(OpenApiClientEntity entity) {
+        return new OpenApiClientEntity().with(entity);
+    }
+
+    public OpenApiClient with(OpenApiClientEntity entity) {
+        OpenApiClient openApiClient = new OpenApiClient();
+        openApiClient.setId(entity.getId());
+        openApiClient.setAppId(entity.getAppId());
+        openApiClient.setSecureKey(entity.getSecureKey());
+        openApiClient.setSignature(Signature.valueOf(entity.getSignature().toUpperCase()));
+        openApiClient.setIpWhiteList(entity.getIpWhiteList());
+        openApiClient.setRedirectUrl(entity.getRedirectUrl());
+        openApiClient.setEnableOAuth2(entity.getEnableOAuth2());
+        return openApiClient;
+    }
+
+    public OpenApiClientEntity(OpenApiClient openApiClient) {
+        this.setId(openApiClient.getAppId());
+        this.setApplicationId(openApiClient.getApplicationId());
+        this.setAppId(openApiClient.getAppId());
+        this.setSecureKey(openApiClient.getSecureKey());
+        this.setIpWhiteList(openApiClient.getIpWhiteList());
+        this.setRedirectUrl(openApiClient.getRedirectUrl());
+        this.setEnableOAuth2(openApiClient.getEnableOAuth2());
+
+    }
+
+    public OpenApiClientEntity() {
+
+    }
+
 }

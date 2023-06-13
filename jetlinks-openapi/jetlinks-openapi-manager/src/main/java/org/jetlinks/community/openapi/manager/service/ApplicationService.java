@@ -7,9 +7,10 @@ import org.hswebframework.web.authorization.DefaultDimensionType;
 import org.hswebframework.web.crud.service.GenericReactiveCrudService;
 import org.hswebframework.web.system.authorization.api.entity.DimensionUserEntity;
 import org.hswebframework.web.system.authorization.defaults.service.DefaultDimensionUserService;
+import org.jetlinks.community.auth.dimension.OrgDimensionType;
+import org.jetlinks.community.openapi.OpenApiClient;
 import org.jetlinks.community.openapi.manager.entity.Application;
 import org.jetlinks.community.openapi.manager.entity.ApplicationEntity;
-import org.jetlinks.community.openapi.manager.entity.OpenApiClient;
 import org.jetlinks.community.openapi.manager.entity.OpenApiClientEntity;
 import org.reactivestreams.Publisher;
 import org.springframework.stereotype.Service;
@@ -45,34 +46,61 @@ public class ApplicationService extends GenericReactiveCrudService<ApplicationEn
 
     }
 
-    public Mono<Application> convertApplication(ApplicationEntity entity) {
-        return localOpenApiClientService
-            .createQuery()
-            .where(OpenApiClientEntity::getApplicationId, entity.getId())
-            .fetchOne()
-            .flatMap(openApiClientEntity -> this.convertOpenApiClient(OpenApiClient.of(openApiClientEntity)))
-            .map(openApiClient -> {
-                Application application = Application.of(entity);
-                application.setApiServer(openApiClient);
-                return application;
-            });
-    }
-
-    private Mono<OpenApiClient> convertOpenApiClient(OpenApiClient openApiClient) {
-        return dimensionUserService
-            .createQuery()
-            .where()
-            .and(DimensionUserEntity::getUserId, openApiClient.getAppId())
-            .and(DimensionUserEntity::getDimensionTypeId, DefaultDimensionType.role.getId())
-            .fetch()
-            .map(dimensionUserEntities -> openApiClient.addRoleIdList(dimensionUserEntities.getDimensionId()))
-            .then(Mono.just(openApiClient));
-    }
 
     public Mono<Application> saveApplication(Publisher<Application> applicationPublisher) {
         return Mono
             .from(applicationPublisher)
             .flatMap(this::doSyncApplication);
+    }
+
+    public Mono<Integer> updateApplication(String applicationId, Mono<Application> applicationPublisher) {
+        return Mono.from(applicationPublisher)
+            .flatMap(application ->
+                application.getApiServer() == null
+                    ? super.updateById(applicationId, application.toApplicationEntity())
+                    : localOpenApiClientService.doSyncUser(application.getApiServer())
+                    .then(super.updateById(applicationId, application.toApplicationEntity()))
+            ).thenReturn(1);
+
+    }
+
+    public Mono<Integer> deleteApplication(String applicationId) {
+
+        return findById(applicationId)
+            .flatMap(old -> super.deleteById(applicationId)
+                .flatMap(a -> localOpenApiClientService.deleteByApplication(applicationId)))
+            .thenReturn(1);
+    }
+
+    public Mono<Application> convertApplication(ApplicationEntity entity) {
+        return localOpenApiClientService
+            .createQuery()
+            .where(OpenApiClientEntity::getApplicationId, entity.getId())
+            .fetchOne()
+            .flatMap(openApiClientEntity -> this.convertOpenApiClient(openApiClientEntity)
+                .map(openApiClient -> {
+                    Application application = Application.of(entity);
+                    application.setApiServer(openApiClient);
+                    return application;
+                }));
+    }
+
+    private Mono<OpenApiClient> convertOpenApiClient(OpenApiClientEntity entity) {
+        OpenApiClient openApiClient = OpenApiClientEntity.of(entity);
+        return dimensionUserService
+            .createQuery()
+            .where()
+            .and(DimensionUserEntity::getUserId, entity.getUserId())
+            .fetch()
+            .map(dimensionUserEntities -> {
+                if (dimensionUserEntities.getDimensionTypeId().equals(DefaultDimensionType.role.getId())) {
+                    openApiClient.addRoleIdList(dimensionUserEntities.getDimensionId());
+                } else if (dimensionUserEntities.getDimensionTypeId().equals(OrgDimensionType.org.getId())) {
+                    openApiClient.addOrgIdList(dimensionUserEntities.getDimensionId());
+                }
+                return openApiClient;
+            })
+            .then(Mono.just(openApiClient));
     }
 
     protected Mono<Application> doSyncApplication(Application entity) {
@@ -90,4 +118,5 @@ public class ApplicationService extends GenericReactiveCrudService<ApplicationEn
                 .thenReturn(1)))
             .thenReturn(entity);
     }
+
 }

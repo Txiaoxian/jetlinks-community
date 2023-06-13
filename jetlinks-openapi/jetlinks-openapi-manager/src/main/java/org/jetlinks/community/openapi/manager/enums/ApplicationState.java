@@ -10,7 +10,9 @@ import org.hswebframework.web.dict.EnumDict;
 @Dict( "application-state")
 public enum ApplicationState implements EnumDict<String> {
     enabled("正常"),
-    disabled("禁用");
+    disabled("禁用"),
+    lock( "锁定"),
+    deleted( "删除");
     private final String text;
 
     @Override

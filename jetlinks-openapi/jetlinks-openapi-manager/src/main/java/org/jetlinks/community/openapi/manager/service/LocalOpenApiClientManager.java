@@ -24,19 +24,19 @@ public class LocalOpenApiClientManager implements OpenApiClientManager {
     @Override
     public Mono<OpenApiClient> getClient(String clientId) {
         return openApiClientService.findById(Mono.just(clientId))
-                .filter(OpenApiClientEntity::statusIsEnabled)
-                .flatMap(client -> authenticationManager.getByUserId(client.getUserId())
-                        .map(auth -> {
-                            OpenApiClient openApiClient = new OpenApiClient();
-                            openApiClient.setAuthentication(auth);
-                            openApiClient.setSignature(Signature.valueOf(client.getSignature().toUpperCase()));
-                            openApiClient.setSecureKey(client.getSecureKey());
-                            if(StringUtils.hasText(client.getIpWhiteList())){
-                                openApiClient.setIpWhiteList(Arrays.asList(client.getIpWhiteList().split("[,;\n]")));
-                            }
-                            openApiClient.setAppId(client.getId());
-                            openApiClient.setClientName(client.getClientName());
-                            return openApiClient;
-                        }));
+            .filter(OpenApiClientEntity::statusIsEnabled)
+            .flatMap(client -> authenticationManager.getByUserId(client.getUserId())
+                .map(auth -> {
+                    OpenApiClient openApiClient = new OpenApiClient();
+                    openApiClient.setAuthentication(auth);
+                    openApiClient.setSignature(Signature.valueOf(client.getSignature().toUpperCase()));
+                    openApiClient.setSecureKey(client.getSecureKey());
+                    if (StringUtils.hasText(client.getIpWhiteList())) {
+                        openApiClient.setIpWhiteList(client.getIpWhiteList());
+                    }
+                    openApiClient.setAppId(client.getId());
+                    openApiClient.setClientName(client.getClientName());
+                    return openApiClient;
+                }));
     }
 }
