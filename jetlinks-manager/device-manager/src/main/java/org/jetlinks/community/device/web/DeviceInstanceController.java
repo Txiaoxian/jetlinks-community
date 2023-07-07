@@ -445,7 +445,7 @@ public class DeviceInstanceController implements
      * @return 设备标签列表
      */
     @GetMapping("/{deviceId}/tags")
-    @SaveAction
+    @QueryAction
     @Operation(summary = "获取设备全部标签数据")
     public Flux<DeviceTagEntity> getDeviceTags(@PathVariable @Parameter(description = "设备ID") String deviceId) {
         return tagRepository.createQuery()

@@ -55,10 +55,11 @@ public class OpenApiClient implements Serializable {
     private Authentication authentication;
 
     public boolean verifyIpAddress(String ipAddress) {
-        List<String> ipWhiteLists = Arrays.asList(ipWhiteList.split("[,;\n]"));
-        if (CollectionUtils.isEmpty(ipWhiteLists) || StringUtils.isEmpty(ipAddress)) {
+
+        if (!StringUtils.hasLength(ipWhiteList) || !StringUtils.hasLength(ipAddress)) {
             return true;
         }
+        List<String> ipWhiteLists = Arrays.asList(ipWhiteList.split("[,;\n]"));
         if (ipAddress.contains(" ")) {
             ipAddress = ipAddress.split("[ ]")[0].trim();
         }
